@@ -1,4 +1,4 @@
-package ru.lazyhat.db.schemas
+package ru.lazyhat.utils
 
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -17,11 +17,15 @@ class UByteEnumerationColumnType<T : Enum<T>>(
 
     override fun notNullValueToDB(value: Any): Any = uByteColumnType.notNullValueToDB(valueUnwrap(value))
 
-    override fun valueToDB(value: Any?): Any? = uByteColumnType.valueToDB(value?.let { valueUnwrap(it) })
+    override fun valueToDB(value: Any?): Any? = uByteColumnType.valueToDB(value?.let {
+        valueUnwrap(it)
+    })
 
-    override fun valueFromDB(value: Any): Any = uByteColumnType.valueFromDB(value).toInt().let { enumEntries[it] }
+    override fun valueFromDB(value: Any): Any {
+        return uByteColumnType.valueFromDB(valueUnwrap(value)).toInt().let { enumEntries[it] }
+    }
 
-    private fun valueUnwrap(value: Any) = (value as Enum<*>).ordinal.toUByte()
+    private fun valueUnwrap(value: Any) = (value as? Enum<*>)?.ordinal?.toUByte() ?: value
 }
 
 fun <T : Enum<T>> Table.ubyteEnumeration(name: String, enumEntries: EnumEntries<T>) =

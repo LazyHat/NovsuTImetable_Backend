@@ -1,24 +1,29 @@
-package ru.lazyhat.db.schemas
+package ru.lazyhat.dbnovsu.schemas
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.datetime.LocalDateTime
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.dao.id.IdTable
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.kotlin.datetime.datetime
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.jetbrains.exposed.sql.transactions.transaction
-import ru.lazyhat.db.models.*
+import ru.lazyhat.dbnovsu.models.*
+import ru.lazyhat.utils.now
+import ru.lazyhat.utils.ubyteEnumeration
 
 interface GroupsService {
     suspend fun insert(new: GroupUpsert): String
+    suspend fun selectAll(): List<Group>
+    suspend fun selectById(id: UInt): Group?
     suspend fun selectByName(name: String): Group?
-    suspend fun selectWhere(query: ISqlExpressionBuilder.() -> Op<Boolean>): List<Group>
     suspend fun update(name: String, update: GroupUpsert): Boolean
     suspend fun deleteWhere(query: ISqlExpressionBuilder.() -> Op<Boolean>): Int
     suspend fun delete(id: UInt): Boolean
 }
 
-class GroupsServiceImpl(database: Database) : GroupsService {
+class GroupsServiceImpl(private val database: Database) : GroupsService {
     object Groups : IdTable<UInt>() {
         override val id: Column<EntityID<UInt>> = uinteger("id").autoIncrement().entityId()
         val name = varchar("name", 4)
@@ -26,6 +31,7 @@ class GroupsServiceImpl(database: Database) : GroupsService {
         val grade = ubyteEnumeration("grade", Grade.entries)
         val qualifier = ubyteEnumeration("qualifier", GroupQualifier.entries)
         val entryYear = short("entry_year")
+        val lastUpdated = datetime("last_updated").clientDefault { LocalDateTime.now() }
 
         override val primaryKey = PrimaryKey(id)
     }
@@ -37,7 +43,7 @@ class GroupsServiceImpl(database: Database) : GroupsService {
     }
 
     private suspend fun <T> dbQuery(block: suspend () -> T): T =
-        newSuspendedTransaction(Dispatchers.IO) { block() }
+        newSuspendedTransaction(Dispatchers.IO, database) { block() }
 
 
     override suspend fun insert(new: GroupUpsert): String = dbQuery {
@@ -46,12 +52,16 @@ class GroupsServiceImpl(database: Database) : GroupsService {
         }[Groups.name]
     }
 
-    override suspend fun selectByName(name: String): Group? = dbQuery {
-        Groups.select { Groups.name eq name }.singleOrNull()?.toGroup()
+    override suspend fun selectAll(): List<Group> = dbQuery {
+        Groups.selectAll().map(ResultRow::toGroup)
     }
 
-    override suspend fun selectWhere(query: ISqlExpressionBuilder.() -> Op<Boolean>): List<Group> = dbQuery {
-        Groups.select(query).map { it.toGroup() }
+    override suspend fun selectById(id: UInt): Group? = dbQuery {
+        Groups.select { Groups.id eq id }.singleOrNull()?.toGroup()
+    }
+
+    override suspend fun selectByName(name: String): Group? = dbQuery {
+        Groups.select { Groups.name eq name }.singleOrNull()?.toGroup()
     }
 
     override suspend fun update(name: String, update: GroupUpsert): Boolean = dbQuery {

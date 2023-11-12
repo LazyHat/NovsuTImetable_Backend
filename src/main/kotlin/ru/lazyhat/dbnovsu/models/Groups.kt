@@ -1,5 +1,6 @@
-package ru.lazyhat.db.models
+package ru.lazyhat.dbnovsu.models
 
+import kotlinx.datetime.LocalDateTime
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -27,7 +28,8 @@ data class Group(
     val institute: Institute,
     val grade: Grade,
     val qualifier: GroupQualifier,
-    val entryYear: Short
+    val entryYear: Short,
+    val lastUpdated: LocalDateTime
 )
 
 @Serializable

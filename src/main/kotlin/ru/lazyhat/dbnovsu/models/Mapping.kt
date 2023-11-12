@@ -1,16 +1,14 @@
-package ru.lazyhat.db.models
+package ru.lazyhat.dbnovsu.models
 
 import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.LocalDateTime
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.statements.UpdateBuilder
-import ru.lazyhat.db.schemas.GroupsServiceImpl
-import ru.lazyhat.db.schemas.LessonsServiceImpl
+import ru.lazyhat.dbnovsu.schemas.GroupsServiceImpl
+import ru.lazyhat.dbnovsu.schemas.LessonsServiceImpl
 import ru.lazyhat.parsing.parseGroupQualifiers
 import ru.lazyhat.parsing.parseInstitute
-
-fun Group.toUpsert() = GroupUpsert(name, institute, grade, qualifier, entryYear)
-
-fun GroupUpsert.toGroup(id: UInt) = Group(id, name, institute, grade, qualifier, entryYear)
+import ru.lazyhat.utils.now
 
 fun Group.toParsedGroup(): ParsedGroup = ParsedGroup(
     grade,
@@ -24,9 +22,6 @@ fun Group.toParsedGroup(): ParsedGroup = ParsedGroup(
 
 fun Lesson.toUpsert() =
     LessonUpsert(title, dow, week, group, subgroup, teacher, auditorium, type, startHour, durationInHours, description)
-
-fun LessonUpsert.toLesson(id: UInt) =
-    Lesson(id, title, dow, week, group, subgroup, teacher, auditorium, type, startHour, durationInHours, description)
 
 fun ParsedGroup.toGroupUpsert(): GroupUpsert =
     refToTimetable
@@ -50,6 +45,7 @@ fun UpdateBuilder<Int>.applyGroup(upsert: GroupUpsert) {
     this[GroupsServiceImpl.Groups.grade] = upsert.grade
     this[GroupsServiceImpl.Groups.qualifier] = upsert.qualifier
     this[GroupsServiceImpl.Groups.entryYear] = upsert.entryYear
+    this[GroupsServiceImpl.Groups.lastUpdated] = LocalDateTime.now()
 }
 
 fun ResultRow.toGroup() = Group(
@@ -58,7 +54,8 @@ fun ResultRow.toGroup() = Group(
     institute = this[GroupsServiceImpl.Groups.institute],
     grade = this[GroupsServiceImpl.Groups.grade],
     qualifier = this[GroupsServiceImpl.Groups.qualifier],
-    entryYear = this[GroupsServiceImpl.Groups.entryYear]
+    entryYear = this[GroupsServiceImpl.Groups.entryYear],
+    lastUpdated = this[GroupsServiceImpl.Groups.lastUpdated]
 )
 
 fun UpdateBuilder<Int>.applyLesson(update: LessonUpsert) {

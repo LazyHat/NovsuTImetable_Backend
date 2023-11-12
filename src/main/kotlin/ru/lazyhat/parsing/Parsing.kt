@@ -8,16 +8,14 @@ import io.ktor.server.application.*
 import kotlinx.coroutines.*
 import kotlinx.datetime.DayOfWeek
 import org.jetbrains.exposed.sql.Op
-import org.jetbrains.exposed.sql.and
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import org.koin.ktor.ext.inject
-import ru.lazyhat.db.models.*
-import ru.lazyhat.db.schemas.GroupsService
-import ru.lazyhat.db.schemas.GroupsServiceImpl
-import ru.lazyhat.db.schemas.LessonsService
-import ru.lazyhat.db.schemas.LessonsServiceImpl
-import kotlin.time.Duration.Companion.seconds
+import ru.lazyhat.dbnovsu.models.*
+import ru.lazyhat.dbnovsu.schemas.GroupsService
+import ru.lazyhat.dbnovsu.schemas.LessonsService
+import ru.lazyhat.dbnovsu.schemas.LessonsServiceImpl
+import kotlin.time.Duration.Companion.minutes
 
 val client = HttpClient(OkHttp)
 
@@ -30,46 +28,35 @@ fun Application.configureParsing() {
     val scope = CoroutineScope(parsingContext)
     scope.launch {
         val novsuGroups = parseOchnGroupTable().also { println("${it.count()} groups in novsu") }
-        val databaseGroups = groupService.selectWhere { Op.TRUE }.also { println("${it.count()} groups in database") }
-        if (novsuGroups.count() != databaseGroups.count()) {
-            println("are not equal")
-            println("deleting all")
-            groupService.deleteWhere { Op.TRUE }
-            println("inserting novsu")
-            novsuGroups.forEach {
-                groupService.insert(it.toGroupUpsert())
-            }
-        } else println("are equal, do nothing")
-        if (lessonsService.selectWhere { Op.TRUE }.isEmpty()) {
-            groupService.selectWhere { Op.TRUE }.forEach {
-                launch {
-                    println("${it.name} $it")
-                    it.parseTimeTable().forEach {
-                        lessonsService.insert(it)
-                        println(it)
-                    }
-                }
-            }
-        }
-        println("set up updater timetable")
         while (true) {
-            databaseGroups.forEach {
-                println("checking group:${it.name}, q:${it.qualifier}, ${it.institute}")
-                val novsuTimetable = it.parseTimeTable()
-                val groupId =
-                    groupService.selectWhere { (GroupsServiceImpl.Groups.name eq it.name) and (GroupsServiceImpl.Groups.qualifier eq it.qualifier) and (GroupsServiceImpl.Groups.institute eq it.institute) }
-                        .first().id
-                val dbTimeTable = lessonsService.selectWhere { LessonsServiceImpl.Lessons.group eq groupId }
-                if (dbTimeTable.map { it.toUpsert() } == novsuTimetable) {
-                    println("check passed")
-                } else {
-                    println("check not passed")
-                    lessonsService.deleteWhere { LessonsServiceImpl.Lessons.group eq groupId }
-                    novsuTimetable.forEach {
-                        lessonsService.insert(it)
-                    }
+            val databaseGroups =
+                groupService.selectAll().also { println("${it.count()} groups in database") }
+            if (novsuGroups.count() != databaseGroups.count()) {
+                println("are not equal")
+                println("deleting all")
+                groupService.deleteWhere { Op.TRUE }
+                println("inserting from novsu")
+                novsuGroups.forEach {
+                    groupService.insert(it.toGroupUpsert())
                 }
-                delay(5.seconds)
+            } else println("are equal, do nothing")
+            println("set up updater timetable")
+            while (true) {
+                databaseGroups.forEach {
+                    println("checking group: id: ${it.id}, name: ${it.name}, q:${it.qualifier}, ${it.institute}")
+                    val novsuTimetable = it.parseTimeTable()
+                    val dbTimeTable = lessonsService.selectByGroup(it.id)
+                    if (dbTimeTable.map { it.toUpsert() } == novsuTimetable) {
+                        println("check passed")
+                    } else {
+                        println("check not passed")
+                        lessonsService.deleteWhere { LessonsServiceImpl.Lessons.group eq it.id }
+                        novsuTimetable.forEach {
+                            lessonsService.insert(it)
+                        }
+                    }
+                    delay(4.minutes)
+                }
             }
         }
     }

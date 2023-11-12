@@ -1,4 +1,4 @@
-package ru.lazyhat.db.schemas
+package ru.lazyhat.dbnovsu.schemas
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.datetime.DayOfWeek
@@ -8,18 +8,20 @@ import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.jetbrains.exposed.sql.transactions.transaction
-import ru.lazyhat.db.models.*
+import ru.lazyhat.dbnovsu.models.*
+import ru.lazyhat.utils.listEnumeration
+import ru.lazyhat.utils.ubyteEnumeration
 
 interface LessonsService {
     suspend fun insert(new: LessonUpsert): UInt
     suspend fun selectById(id: UInt): Lesson?
-    suspend fun selectWhere(query: ISqlExpressionBuilder.() -> Op<Boolean>): List<Lesson>
+    suspend fun selectByGroup(id: UInt): List<Lesson>
     suspend fun update(id: UInt, update: LessonUpsert): Boolean
     suspend fun deleteWhere(query: ISqlExpressionBuilder.() -> Op<Boolean>): Int
     suspend fun delete(id: UInt): Boolean
 }
 
-class LessonsServiceImpl(database: Database) : LessonsService {
+class LessonsServiceImpl(private val database: Database) : LessonsService {
     object Lessons : IdTable<UInt>() {
         override val id: Column<EntityID<UInt>> = uinteger("id").autoIncrement().entityId()
         val title = text("title")
@@ -44,7 +46,7 @@ class LessonsServiceImpl(database: Database) : LessonsService {
     }
 
     private suspend fun <T> dbQuery(block: suspend () -> T): T =
-        newSuspendedTransaction(Dispatchers.IO) { block() }
+        newSuspendedTransaction(Dispatchers.IO, database) { block() }
 
 
     override suspend fun insert(new: LessonUpsert): UInt = dbQuery {
@@ -57,8 +59,8 @@ class LessonsServiceImpl(database: Database) : LessonsService {
         Lessons.select(Lessons.id eq id).singleOrNull()?.toLesson()
     }
 
-    override suspend fun selectWhere(query: ISqlExpressionBuilder.() -> Op<Boolean>): List<Lesson> = dbQuery {
-        Lessons.select(query).map { it.toLesson() }
+    override suspend fun selectByGroup(id: UInt): List<Lesson> = dbQuery {
+        Lessons.select { Lessons.group eq id }.map(ResultRow::toLesson)
     }
 
     override suspend fun update(id: UInt, update: LessonUpsert): Boolean = dbQuery {

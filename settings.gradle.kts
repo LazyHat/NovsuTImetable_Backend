@@ -1,1 +1,1 @@
-rootProject.name = "ru.lazyhat.novsutimetable"
+rootProject.name = "ru.lazyhat.backend"

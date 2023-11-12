@@ -1,4 +1,4 @@
-package ru.lazyhat.db.models
+package ru.lazyhat.dbnovsu.models
 
 import kotlinx.datetime.DayOfWeek
 import kotlinx.serialization.Serializable
