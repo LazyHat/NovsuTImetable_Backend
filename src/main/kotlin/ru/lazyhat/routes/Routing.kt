@@ -29,7 +29,7 @@ fun Application.configureRouting() {
                     get {
                         val id = call.parameters["id"]!!.toUInt()
                         call.respond(
-                            novsuRepository.getGroupById(id) ?: HttpStatusCode.BadRequest
+                            novsuRepository.getGroupByIdAndUpdate(id) ?: HttpStatusCode.BadRequest
                         )
                     }
                     get("lessons") {

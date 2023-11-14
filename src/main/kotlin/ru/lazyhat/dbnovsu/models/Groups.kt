@@ -45,7 +45,8 @@ data class GroupUpsert(
     val institute: Institute,
     val grade: Grade,
     val qualifier: GroupQualifier,
-    val entryYear: Short
+    val entryYear: Short,
+    val lastUpdated: LocalDateTime
 )
 
 data class ParsedGroup(

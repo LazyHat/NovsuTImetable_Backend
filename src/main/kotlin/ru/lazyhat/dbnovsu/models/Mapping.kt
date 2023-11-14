@@ -35,7 +35,8 @@ fun ParsedGroup.toGroupUpsert(): GroupUpsert =
                 it["instId"]!!.parseInstitute(),
                 grade,
                 it["type"]!!.parseGroupQualifiers(),
-                it["year"]!!.toShort()
+                it["year"]!!.toShort(),
+                LocalDateTime.now()
             )
         }
 
@@ -85,6 +86,10 @@ fun ResultRow.toLesson() = Lesson(
     startHour = this[LessonsServiceImpl.Lessons.startHour],
     durationInHours = this[LessonsServiceImpl.Lessons.durationInHours],
     description = this[LessonsServiceImpl.Lessons.description]
+)
+
+fun Group.toGroupUpsert() = GroupUpsert(
+    name, institute, grade, qualifier, entryYear, lastUpdated
 )
 
 val qualifiersCodes = mapOf(

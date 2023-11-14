@@ -18,7 +18,7 @@ interface GroupsService {
     suspend fun selectAll(): List<Group>
     suspend fun selectById(id: UInt): Group?
     suspend fun selectByName(name: String): Group?
-    suspend fun update(name: String, update: GroupUpsert): Boolean
+    suspend fun update(id: UInt, update: GroupUpsert): Boolean
     suspend fun deleteWhere(query: ISqlExpressionBuilder.() -> Op<Boolean>): Int
     suspend fun delete(id: UInt): Boolean
 }
@@ -64,8 +64,8 @@ class GroupsServiceImpl(private val database: Database) : GroupsService {
         Groups.select { Groups.name eq name }.singleOrNull()?.toGroup()
     }
 
-    override suspend fun update(name: String, update: GroupUpsert): Boolean = dbQuery {
-        Groups.update({ Groups.name eq name }) { it.applyGroup(update) }
+    override suspend fun update(id: UInt, update: GroupUpsert): Boolean = dbQuery {
+        Groups.update({ Groups.id eq id }) { it.applyGroup(update) }
     } == 1
 
     override suspend fun deleteWhere(query: ISqlExpressionBuilder.() -> Op<Boolean>): Int = dbQuery {
