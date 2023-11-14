@@ -20,7 +20,7 @@ class NovsuRepositoryImpl(
     override suspend fun getAllGroups(): List<Group> = groupsService.selectAll()
 
     override suspend fun getLessons(groupId: UInt): List<Lesson> =
-        lessonsService.selectByGroup(groupId).takeIf { it.isEmpty() } ?: groupsService.selectById(groupId)?.let {
+        lessonsService.selectByGroup(groupId).takeIf { it.isNotEmpty() } ?: groupsService.selectById(groupId)?.let {
            it.updateLessons()
             lessonsService.selectByGroup(groupId)
         } ?: listOf()
