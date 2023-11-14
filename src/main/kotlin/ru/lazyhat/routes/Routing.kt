@@ -13,7 +13,6 @@ import ru.lazyhat.dbnovsu.schemas.LessonsService
 import ru.lazyhat.dbproducts.models.DAO
 import ru.lazyhat.dbproducts.repo.ProductsRepository
 
-@OptIn(ExperimentalStdlibApi::class)
 fun Application.configureRouting() {
     val groupsService by inject<GroupsService>()
     val lessonsService by inject<LessonsService>()
@@ -23,37 +22,23 @@ fun Application.configureRouting() {
         get {
             call.respondText("Hello World!")
         }
-        //TODO DELETE METHOD AFTER UPDATE TO v0.2.0
-        route("groups") {
-            get {
-                val k = groupsService.selectAll()
-                call.respond(
-                    k
-                )
-            }
-            get("{id}") {
-                val id = call.parameters["id"]!!.toUInt()
-                call.respond(
-                    lessonsService.selectByGroup(id)
-                )
-            }
-        }
         route("tt") {
-            route("v0-2-0") {
-                route("groups") {
-                    route("{id}") {
-                        get {
-                            val id = call.parameters["id"]!!.toUInt()
-                            call.respond(
-                                groupsService.selectById(id) ?: HttpStatusCode.BadRequest
-                            )
-                        }
-                        get("lessons") {
-                            val id = call.parameters["id"]!!.toUInt()
-                            call.respond(
-                                lessonsService.selectByGroup(id)
-                            )
-                        }
+            route("groups") {
+                get{
+                    call.respond(groupsService.selectAll());
+                }
+                route("{id}") {
+                    get {
+                        val id = call.parameters["id"]!!.toUInt()
+                        call.respond(
+                            groupsService.selectById(id) ?: HttpStatusCode.BadRequest
+                        )
+                    }
+                    get("lessons") {
+                        val id = call.parameters["id"]!!.toUInt()
+                        call.respond(
+                            lessonsService.selectByGroup(id)
+                        )
                     }
                 }
             }
