@@ -8,14 +8,12 @@ import io.ktor.server.routing.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.koin.ktor.ext.inject
-import ru.lazyhat.dbnovsu.schemas.GroupsService
-import ru.lazyhat.dbnovsu.schemas.LessonsService
+import ru.lazyhat.dbnovsu.repo.NovsuRepository
 import ru.lazyhat.dbproducts.models.DAO
 import ru.lazyhat.dbproducts.repo.ProductsRepository
 
 fun Application.configureRouting() {
-    val groupsService by inject<GroupsService>()
-    val lessonsService by inject<LessonsService>()
+    val novsuRepository by inject<NovsuRepository>()
     val productsRepository by inject<ProductsRepository>()
 
     routing {
@@ -25,19 +23,19 @@ fun Application.configureRouting() {
         route("tt") {
             route("groups") {
                 get{
-                    call.respond(groupsService.selectAll());
+                    call.respond(novsuRepository.getAllGroups());
                 }
                 route("{id}") {
                     get {
                         val id = call.parameters["id"]!!.toUInt()
                         call.respond(
-                            groupsService.selectById(id) ?: HttpStatusCode.BadRequest
+                            novsuRepository.getGroupById(id) ?: HttpStatusCode.BadRequest
                         )
                     }
                     get("lessons") {
                         val id = call.parameters["id"]!!.toUInt()
                         call.respond(
-                            lessonsService.selectByGroup(id)
+                            novsuRepository.getLessons(id)
                         )
                     }
                 }
