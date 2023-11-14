@@ -18,6 +18,7 @@ enum class Institute(val code: String) {
 @Serializable
 enum class GroupQualifier { DO, DU, VO, VU, ZO, ZU }
 
+@Suppress("unused")
 @Serializable
 enum class Grade(val number: Int) {
     First(1),

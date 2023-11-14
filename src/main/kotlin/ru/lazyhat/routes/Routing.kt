@@ -23,7 +23,7 @@ fun Application.configureRouting() {
         route("tt") {
             route("groups") {
                 get{
-                    call.respond(novsuRepository.getAllGroups());
+                    call.respond(novsuRepository.getAllGroups())
                 }
                 route("{id}") {
                     get {
