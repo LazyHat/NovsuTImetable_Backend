@@ -7,14 +7,17 @@ import io.ktor.client.statement.*
 import io.ktor.server.application.*
 import kotlinx.coroutines.*
 import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.LocalDateTime
 import org.jetbrains.exposed.sql.Op
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import org.koin.ktor.ext.inject
+import ru.lazyhat.dbnovsu.WeekState
 import ru.lazyhat.dbnovsu.models.*
 import ru.lazyhat.dbnovsu.schemas.GroupsService
 import ru.lazyhat.dbnovsu.schemas.LessonsService
 import ru.lazyhat.dbnovsu.schemas.LessonsServiceImpl
+import ru.lazyhat.utils.now
 import kotlin.time.Duration.Companion.minutes
 
 val client = HttpClient(OkHttp)
@@ -25,6 +28,8 @@ val parsingContext = newSingleThreadContext("parsing")
 fun Application.configureParsing() {
     val groupService by inject<GroupsService>()
     val lessonsService by inject<LessonsService>()
+    val weekState by inject<WeekState>()
+
     val scope = CoroutineScope(parsingContext)
     scope.launch {
         val novsuGroups = parseOchnGroupTable().also { println("${it.count()} groups in novsu") }
@@ -36,13 +41,25 @@ fun Application.configureParsing() {
                 println("deleting all")
                 groupService.deleteWhere { Op.TRUE }
                 println("inserting from novsu")
-                novsuGroups.forEach {
+                novsuGroups.also { println("novsu groups count: ${it.count()}") }.forEach {
                     groupService.insert(it.toGroupUpsert())
                 }
             } else println("are equal, do nothing")
+            println("try update week")
+            if (LocalDateTime.now().date.dayOfWeek != DayOfWeek.SUNDAY)
+                weekState.set(parseWeek().also {
+                    println("current week: ${it.name}")
+                    println("updated succesfully")
+                })
+            else
+                println("week could not updated")
+            
             println("set up updater timetable")
+
+            val databaseGroupsUpdater = groupService.selectAll()
+
             while (true) {
-                databaseGroups.forEach {
+                databaseGroupsUpdater.forEach {
                     println("checking group: id: ${it.id}, name: ${it.name}, q:${it.qualifier}, ${it.institute}")
                     val novsuTimetable = it.parseTimeTable()
                     val dbTimeTable = lessonsService.selectByGroup(it.id)
@@ -55,7 +72,7 @@ fun Application.configureParsing() {
                             lessonsService.insert(it)
                         }
                     }
-                    delay(4.minutes)
+                    delay(1.minutes)
                 }
             }
         }
@@ -164,4 +181,24 @@ suspend fun Group.parseTimeTable(): List<LessonUpsert> {
         )
     }
     return lessons
+}
+
+suspend fun parseWeek(): Week {
+    val doc = client.get("https://portal.novsu.ru/study").bodyAsText().let { Jsoup.parse(it) }
+    val body = doc.body()
+    val divNovsu = body.getElementsByClass("novsu").first()!!
+    val divBody = divNovsu.getElementById("body")!!
+    val divRow = divBody.getElementsByClass("row").first()!!
+    val divRowEl = divRow.getElementsByClass("row_el").first()!!
+    val divCol = divRowEl.getElementsByClass("col").first()!!
+    val divColElement = divCol.getElementsByClass("col_element").first()!!
+    val divBlock3 = divColElement.getElementsByClass("block3").first()!!
+    val divBlock_3padding = divBlock3.getElementsByClass("block_3padding").first()!!
+    val weekText = divBlock_3padding.getElementsByTag("b").first()!!.text()
+    return if (weekText.contains("верхняя"))
+        Week.Upper
+    else if (weekText.contains("нижняя"))
+        Week.Lower
+    else
+        Week.All
 }

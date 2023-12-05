@@ -22,7 +22,7 @@ fun Application.configureRouting() {
         }
         route("tt") {
             route("groups") {
-                get{
+                get {
                     call.respond(novsuRepository.getAllGroups())
                 }
                 route("{id}") {
@@ -39,6 +39,9 @@ fun Application.configureRouting() {
                         )
                     }
                 }
+            }
+            get("week") {
+                call.respond(novsuRepository.getWeek())
             }
         }
         route("products") {

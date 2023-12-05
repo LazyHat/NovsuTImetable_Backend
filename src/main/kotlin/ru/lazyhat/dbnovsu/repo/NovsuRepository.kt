@@ -1,8 +1,10 @@
 package ru.lazyhat.dbnovsu.repo
 
 import kotlinx.datetime.LocalDateTime
+import ru.lazyhat.dbnovsu.WeekState
 import ru.lazyhat.dbnovsu.models.Group
 import ru.lazyhat.dbnovsu.models.Lesson
+import ru.lazyhat.dbnovsu.models.Week
 import ru.lazyhat.dbnovsu.models.toGroupUpsert
 import ru.lazyhat.dbnovsu.schemas.GroupsService
 import ru.lazyhat.dbnovsu.schemas.LessonsService
@@ -14,11 +16,13 @@ interface NovsuRepository {
     suspend fun getAllGroups(): List<Group>
     suspend fun getLessons(groupId: UInt): List<Lesson>
     suspend fun getGroupByIdAndUpdate(id: UInt): Group?
+    fun getWeek(): Week
 }
 
 class NovsuRepositoryImpl(
     private val groupsService: GroupsService,
-    private val lessonsService: LessonsService
+    private val lessonsService: LessonsService,
+    private val weekState: WeekState
 ) : NovsuRepository {
     override suspend fun getAllGroups(): List<Group> = groupsService.selectAll()
 
@@ -34,6 +38,7 @@ class NovsuRepositoryImpl(
         groupsService.selectById(id)
     }
 
+    override fun getWeek(): Week = weekState.get()
     private suspend fun Group.updateLessons() {
         lessonsService.deleteWhere { LessonsServiceImpl.Lessons.group eq this@updateLessons.id }
         parseTimeTable().forEach {

@@ -7,6 +7,8 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import org.koin.core.module.Module
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
+import ru.lazyhat.dbnovsu.WeekState
+import ru.lazyhat.dbnovsu.WeekStateImpl
 import ru.lazyhat.dbnovsu.repo.NovsuRepository
 import ru.lazyhat.dbnovsu.repo.NovsuRepositoryImpl
 import ru.lazyhat.dbnovsu.schemas.GroupsService
@@ -35,7 +37,9 @@ fun Application.configureDatabaseModule(): Module {
         }
         this.single<LessonsService> { LessonsServiceImpl(this.get(named("novsu"))) }
         this.single<GroupsService> { GroupsServiceImpl(this.get(named("novsu"))) }
-        this.single<NovsuRepository> { NovsuRepositoryImpl(get(), get()) }
+        this.single<WeekState> { WeekStateImpl() }
+        this.single<NovsuRepository> { NovsuRepositoryImpl(get(), get(), get()) }
+
 
         this.single<Database>(named("products")) {
             Database.connect(

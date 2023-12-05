@@ -27,7 +27,7 @@ class LessonsServiceImpl(private val database: Database) : LessonsService {
         val title = text("title")
         val dow = ubyteEnumeration("dow", DayOfWeek.entries)
         val week = ubyteEnumeration("week", Week.entries)
-        val group = reference("group", GroupsServiceImpl.Groups)
+        val group = reference("group", GroupsServiceImpl.Groups, onDelete = ReferenceOption.CASCADE)
         val subgroup = ubyte("subgroup")
         val teacher = varchar("teacher", 60)
         val auditorium = varchar("auditorium", 20)
