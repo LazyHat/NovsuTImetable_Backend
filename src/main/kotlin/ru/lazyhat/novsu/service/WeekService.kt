@@ -37,6 +37,7 @@ class WeekServiceImpl(private val networkSource: NetworkSource) : WeekService {
         CoroutineScope(Dispatchers.IO).launch {
             updateWeek()
             while (LocalDateTime.now().date.dayOfWeek != DayOfWeek.MONDAY) {
+                logWeekService("dow is not ${DayOfWeek.MONDAY.name}, sleep for 6 hours")
                 delay(6.hours)
             }
             while (true) {
