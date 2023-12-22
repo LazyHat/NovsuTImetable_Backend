@@ -1,204 +1,72 @@
 package ru.lazyhat.parsing
 
-import io.ktor.client.*
-import io.ktor.client.engine.okhttp.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
 import io.ktor.server.application.*
 import kotlinx.coroutines.*
-import kotlinx.datetime.DayOfWeek
-import kotlinx.datetime.LocalDateTime
 import org.jetbrains.exposed.sql.Op
-import org.jsoup.Jsoup
-import org.jsoup.nodes.Element
 import org.koin.ktor.ext.inject
-import ru.lazyhat.dbnovsu.WeekState
-import ru.lazyhat.dbnovsu.models.*
-import ru.lazyhat.dbnovsu.schemas.GroupsService
-import ru.lazyhat.dbnovsu.schemas.LessonsService
-import ru.lazyhat.dbnovsu.schemas.LessonsServiceImpl
-import ru.lazyhat.utils.now
+import ru.lazyhat.novsu.models.toLessonUpsert
+import ru.lazyhat.novsu.models.toUpsert
+import ru.lazyhat.novsu.source.db.schemas.GroupsService
+import ru.lazyhat.novsu.source.db.schemas.LessonsService
+import ru.lazyhat.novsu.source.db.schemas.LessonsServiceImpl
+import ru.lazyhat.novsu.source.net.NetworkSource
 import kotlin.time.Duration.Companion.minutes
-
-val client = HttpClient(OkHttp)
 
 @OptIn(ExperimentalCoroutinesApi::class, DelicateCoroutinesApi::class)
 val parsingContext = newSingleThreadContext("parsing")
+private fun logParsing(string: String) = println("Parsing: $string")
 
 fun Application.configureParsing() {
+    val networkSource by inject<NetworkSource>()
     val groupService by inject<GroupsService>()
     val lessonsService by inject<LessonsService>()
-    val weekState by inject<WeekState>()
 
     val scope = CoroutineScope(parsingContext)
+
     scope.launch {
-        val novsuGroups = parseOchnGroupTable().also { println("${it.count()} groups in novsu") }
+        val novsuGroups = networkSource.getOchnGroupsTable().also { logParsing("${it.count()} groups in novsu") }
         while (true) {
             val databaseGroups =
-                groupService.selectAll().also { println("${it.count()} groups in database") }
+                groupService.selectAll().also { logParsing("${it.count()} groups in database") }
             if (novsuGroups.count() != databaseGroups.count()) {
-                println("are not equal")
-                println("deleting all")
+                logParsing("are not equal")
+                logParsing("deleting all")
                 groupService.deleteWhere { Op.TRUE }
-                println("inserting from novsu")
-                novsuGroups.also { println("novsu groups count: ${it.count()}") }.forEach {
-                    groupService.insert(it.toGroupUpsert())
+                logParsing("inserting from novsu")
+                novsuGroups.also { logParsing("novsu groups count: ${it.count()}") }.forEach {
+                    groupService.insert(it)
                 }
-            } else println("are equal, do nothing")
-            println("try update week")
-            if (LocalDateTime.now().date.dayOfWeek != DayOfWeek.SUNDAY)
-                weekState.set(parseWeek().also {
-                    println("current week: ${it.name}")
-                    println("updated succesfully")
-                })
-            else
-                println("week could not updated")
-            
-            println("set up updater timetable")
+            } else logParsing("are equal, do nothing")
+            delay(10.minutes)
+        }
+    }
 
-            val databaseGroupsUpdater = groupService.selectAll()
+    logParsing("set up updater timetable")
 
-            while (true) {
-                databaseGroupsUpdater.forEach {
-                    println("checking group: id: ${it.id}, name: ${it.name}, q:${it.qualifier}, ${it.institute}")
-                    val novsuTimetable = it.parseTimeTable()
-                    val dbTimeTable = lessonsService.selectByGroup(it.id)
+    scope.launch {
+        while (true) {
+            val groups = groupService.selectAll()
+            if (groups.isNotEmpty()) {
+                groups.forEach { group ->
+                    logParsing("checking group: id: ${group.id}, name: ${group.name}, q:${group.qualifier}, ${group.institute}")
+                    val novsuTimetable = networkSource.getTimetable(group)
+                    val dbTimeTable = lessonsService.selectByGroup(group.id)
                     if (dbTimeTable.map { it.toUpsert() } == novsuTimetable) {
-                        println("check passed")
+                        logParsing("check passed")
                     } else {
-                        println("check not passed")
-                        lessonsService.deleteWhere { LessonsServiceImpl.Lessons.group eq it.id }
+                        logParsing("check not passed")
+                        lessonsService.deleteWhere { LessonsServiceImpl.Lessons.group eq group.id }
                         novsuTimetable.forEach {
-                            lessonsService.insert(it)
+                            lessonsService.insert(it.toLessonUpsert(group.id))
                         }
                     }
+                    logParsing("updated")
                     delay(1.minutes)
                 }
-            }
+                logParsing("All Groups Checked")
+            } else
+                logParsing("Groups are empty")
+            delay(1.minutes)
         }
     }
-}
-
-fun String.parseType(): List<LessonType> = split("/").mapNotNull { str ->
-    typeCodes.forEach {
-        if (str.contains(it.key)) return@mapNotNull it.value
-    }
-    null
-}
-
-fun String.parseDOW(): DayOfWeek = dowCodes[this]!!
-fun String.parseInstitute(): Institute = Institute.entries.find { it.code == this }!!
-fun String.parseGroupQualifiers(): GroupQualifier = qualifiersCodes[this]!!
-
-suspend fun parseOchnGroupTable(): List<ParsedGroup> {
-    val doc = client.get("https://portal.novsu.ru/univer/timetable/ochn").bodyAsText().let { Jsoup.parse(it) }
-    val body = doc.body()
-    val divNovsu = body.getElementsByClass("novsu").first()!!
-    val divBody = divNovsu.getElementById("body")!!
-    val divRow = divBody.getElementsByClass("row").first()!!
-    val divRowEl = divRow.getElementsByClass("row_el").first()!!
-    val divCol = divRowEl.getElementsByClass("col").first()!!
-    val divColElement = divCol.getElementsByClass("col_element").first()!!
-    val divBlockContent = divColElement.getElementsByClass("block_content").first()!!
-    val viewTables = divBlockContent.getElementsByClass("viewtable")
-    val filteredViewTables = viewTables.filterIndexed { index, emenent -> index % 4 == 2 }
-    val groups = filteredViewTables.map {
-        it.getElementsByTag("tr").drop(1).first().getElementsByTag("td").mapIndexed { index, element ->
-            val grade = Grade.entries[index]
-            element.getElementsByTag("a").map {
-                ParsedGroup(grade, it.attr("href"))
-            }
-        }
-    }
-    return groups.flatten().flatten()
-}
-
-
-suspend fun Group.parseTimeTable(): List<LessonUpsert> {
-    val parsed = this.toParsedGroup()
-    val doc = client.get("https://portal.novsu.ru" + parsed.refToTimetable).bodyAsText().let { Jsoup.parse(it) }
-    val body = doc.body()
-    val divNovsu = body.getElementsByClass("novsu").first()!!
-    val divBody = divNovsu.getElementById("body")!!
-    val divRow = divBody.getElementsByClass("row").first()!!
-    val divRowEl = divRow.getElementsByClass("row_el").first()!!
-    val divCol = divRowEl.getElementsByClass("col").first()!!
-    val divColElement = divCol.getElementsByClass("col_element").first()!!
-    val divBlockContent = divColElement.getElementsByClass("block_content").first()!!
-    val tableScheduleTable = divBlockContent.getElementsByClass("shedultable").first() ?: return listOf()
-    val tableRows = tableScheduleTable.getElementsByTag("tr").drop(1)
-    val dows = tableRows.filter { it.getElementsByTag("td").count() == 1 }.map {
-        it.text().parseDOW() to it.child(0).attr("rowspan").toInt()
-    }
-    val daysPairs = mutableListOf<Pair<DayOfWeek, List<Element>>>()
-    var dowCount = 1
-    dows.forEachIndexed { index, it ->
-        daysPairs.add(dows[index].first to tableRows.subList(dowCount, dowCount + it.second - 1))
-        dowCount += it.second
-    }
-    val days = daysPairs.map { pair -> pair.second.map { pair.first to it } }.flatten()
-    val lessons = days.mapIndexed { index, pair ->
-        val tableDatas = pair.second.getElementsByTag("td")
-        val dow = pair.first
-        val timeExists = tableDatas.count() == 6
-        val time = (if (timeExists) tableDatas[0].textNodes() else days.subList(0, index).findLast {
-            it.second.getElementsByTag("td").first()!!.hasAttr("rowspan")
-        }!!.second.getElementsByTag("td").first()!!.textNodes()).let {
-            val startHour =
-                it.first().text().substringBefore(":").trim().filter { it.isDigit() }.takeIf { it.isNotEmpty() }
-                    ?.toUByte()
-            val durationInHours = it.filter { !it.isBlank }.count().toUByte()
-            startHour?.let { it to durationInHours }
-        }
-        val startIndex = if (timeExists) 1 else 0
-        val subgroup = tableDatas[startIndex].text().filter { it.isDigit() }.takeIf { it.isNotEmpty() }?.toUByte() ?: 0U
-        val type = tableDatas[startIndex + 1].getElementsByTag("b").first()?.text()?.parseType() ?: emptyList()
-        val title = tableDatas[startIndex + 1].ownText()
-        val teacher = tableDatas[startIndex + 2].text()
-        val auditorium = tableDatas[startIndex + 3].text().trim().takeIf { it != "." }
-        val week = tableDatas[startIndex + 4].text().let {
-            weekCodes.forEach { code ->
-                if (it.contains(code.key)) return@let code.toPair()
-            }
-            null to Week.All
-        }
-        val description = tableDatas[startIndex + 4].text().let {
-            if (week.first != null) it.replace(week.first!!, "")
-            else it
-        }
-        LessonUpsert(
-            title,
-            dow,
-            week.second,
-            this.id,
-            subgroup,
-            teacher,
-            auditorium.orEmpty(),
-            type,
-            time?.first ?: 0u,
-            time?.second ?: 0u,
-            description
-        )
-    }
-    return lessons
-}
-
-suspend fun parseWeek(): Week {
-    val doc = client.get("https://portal.novsu.ru/study").bodyAsText().let { Jsoup.parse(it) }
-    val body = doc.body()
-    val divNovsu = body.getElementsByClass("novsu").first()!!
-    val divBody = divNovsu.getElementById("body")!!
-    val divRow = divBody.getElementsByClass("row").first()!!
-    val divRowEl = divRow.getElementsByClass("row_el").first()!!
-    val divCol = divRowEl.getElementsByClass("col").first()!!
-    val divColElement = divCol.getElementsByClass("col_element").first()!!
-    val divBlock3 = divColElement.getElementsByClass("block3").first()!!
-    val divBlock_3padding = divBlock3.getElementsByClass("block_3padding").first()!!
-    val weekText = divBlock_3padding.getElementsByTag("b").first()!!.text()
-    return if (weekText.contains("верхняя"))
-        Week.Upper
-    else if (weekText.contains("нижняя"))
-        Week.Lower
-    else
-        Week.All
 }

@@ -1,4 +1,4 @@
-package ru.lazyhat.dbnovsu.models
+package ru.lazyhat.novsu.models
 
 import kotlinx.datetime.LocalDateTime
 import kotlinx.serialization.Serializable
@@ -49,6 +49,8 @@ data class GroupUpsert(
     val entryYear: Short,
     val lastUpdated: LocalDateTime
 )
+
+typealias GroupNetwork = GroupUpsert
 
 data class ParsedGroup(
     val grade: Grade,

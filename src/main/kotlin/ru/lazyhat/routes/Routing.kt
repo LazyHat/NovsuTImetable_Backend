@@ -8,9 +8,9 @@ import io.ktor.server.routing.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.koin.ktor.ext.inject
-import ru.lazyhat.dbnovsu.repo.NovsuRepository
 import ru.lazyhat.dbproducts.models.DAO
 import ru.lazyhat.dbproducts.repo.ProductsRepository
+import ru.lazyhat.novsu.repo.NovsuRepository
 
 fun Application.configureRouting() {
     val novsuRepository by inject<NovsuRepository>()

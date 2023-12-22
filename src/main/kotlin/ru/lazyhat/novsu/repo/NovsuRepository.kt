@@ -1,28 +1,26 @@
-package ru.lazyhat.dbnovsu.repo
+package ru.lazyhat.novsu.repo
 
 import kotlinx.datetime.LocalDateTime
-import ru.lazyhat.dbnovsu.WeekState
-import ru.lazyhat.dbnovsu.models.Group
-import ru.lazyhat.dbnovsu.models.Lesson
-import ru.lazyhat.dbnovsu.models.Week
-import ru.lazyhat.dbnovsu.models.toGroupUpsert
-import ru.lazyhat.dbnovsu.schemas.GroupsService
-import ru.lazyhat.dbnovsu.schemas.LessonsService
-import ru.lazyhat.dbnovsu.schemas.LessonsServiceImpl
-import ru.lazyhat.parsing.parseTimeTable
+import ru.lazyhat.novsu.models.*
+import ru.lazyhat.novsu.service.WeekService
+import ru.lazyhat.novsu.source.db.schemas.GroupsService
+import ru.lazyhat.novsu.source.db.schemas.LessonsService
+import ru.lazyhat.novsu.source.db.schemas.LessonsServiceImpl
+import ru.lazyhat.novsu.source.net.NetworkSource
 import ru.lazyhat.utils.now
 
 interface NovsuRepository {
     suspend fun getAllGroups(): List<Group>
     suspend fun getLessons(groupId: UInt): List<Lesson>
     suspend fun getGroupByIdAndUpdate(id: UInt): Group?
-    fun getWeek(): Week
+    suspend fun getWeek(): Week
 }
 
 class NovsuRepositoryImpl(
     private val groupsService: GroupsService,
     private val lessonsService: LessonsService,
-    private val weekState: WeekState
+    private val weekService: WeekService,
+    private val networkSource: NetworkSource
 ) : NovsuRepository {
     override suspend fun getAllGroups(): List<Group> = groupsService.selectAll()
 
@@ -38,11 +36,11 @@ class NovsuRepositoryImpl(
         groupsService.selectById(id)
     }
 
-    override fun getWeek(): Week = weekState.get()
+    override suspend fun getWeek(): Week = weekService.week.value
     private suspend fun Group.updateLessons() {
         lessonsService.deleteWhere { LessonsServiceImpl.Lessons.group eq this@updateLessons.id }
-        parseTimeTable().forEach {
-            lessonsService.insert(it)
+        networkSource.getTimetable(this).forEach {
+            lessonsService.insert(it.toLessonUpsert(this.id))
         }
     }
 }

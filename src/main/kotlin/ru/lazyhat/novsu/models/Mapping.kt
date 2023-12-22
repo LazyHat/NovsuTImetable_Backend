@@ -1,13 +1,11 @@
-package ru.lazyhat.dbnovsu.models
+package ru.lazyhat.novsu.models
 
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDateTime
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.statements.UpdateBuilder
-import ru.lazyhat.dbnovsu.schemas.GroupsServiceImpl
-import ru.lazyhat.dbnovsu.schemas.LessonsServiceImpl
-import ru.lazyhat.parsing.parseGroupQualifiers
-import ru.lazyhat.parsing.parseInstitute
+import ru.lazyhat.novsu.source.db.schemas.GroupsServiceImpl
+import ru.lazyhat.novsu.source.db.schemas.LessonsServiceImpl
 import ru.lazyhat.utils.now
 
 fun Group.toParsedGroup(): ParsedGroup = ParsedGroup(
@@ -20,8 +18,46 @@ fun Group.toParsedGroup(): ParsedGroup = ParsedGroup(
             "year=$entryYear"
 )
 
+//fun ParsedGroup.toGroup(id: UInt): Group = toGroupUpsert().let {
+//    Group(
+//        id,
+//        it.name,
+//        it.institute,
+//        it.grade,
+//        it.qualifier,
+//        it.entryYear,
+//        it.lastUpdated
+//    )
+//}
+
+fun LessonNetwork.toLessonUpsert(groupId: UInt): LessonUpsert = LessonUpsert(
+    title,
+    dow,
+    week,
+    groupId,
+    subgroup,
+    teacher,
+    auditorium,
+    type,
+    startHour,
+    durationInHours,
+    description
+)
+
 fun Lesson.toUpsert() =
-    LessonUpsert(title, dow, week, group, subgroup, teacher, auditorium, type, startHour, durationInHours, description)
+    LessonUpsert(
+        title,
+        dow,
+        week,
+        group,
+        subgroup,
+        teacher,
+        auditorium,
+        type,
+        startHour,
+        durationInHours,
+        description
+    )
 
 fun ParsedGroup.toGroupUpsert(): GroupUpsert =
     refToTimetable
@@ -39,6 +75,10 @@ fun ParsedGroup.toGroupUpsert(): GroupUpsert =
                 LocalDateTime.now()
             )
         }
+
+fun String.parseInstitute(): Institute = Institute.entries.find { it.code == this }!!
+fun String.parseGroupQualifiers(): GroupQualifier = qualifiersCodes[this]!!
+fun String.parseDOW(): DayOfWeek = dowCodes[this]!!
 
 fun UpdateBuilder<Int>.applyGroup(upsert: GroupUpsert) {
     this[GroupsServiceImpl.Groups.name] = upsert.name
@@ -118,9 +158,9 @@ val typeCodes = mapOf(
     "конс" to LessonType.Consultation
 )
 
-val weekCodes = mapOf(
-    "по верх. неделе" to Week.Upper,
-    "по нижн. неделе" to Week.Lower,
-    "по верхней неделе" to Week.Upper,
-    "по нижней неделе" to Week.Lower
+val weekLessonCodes = mapOf(
+    "по верх. неделе" to WeekLesson.Upper,
+    "по нижн. неделе" to WeekLesson.Lower,
+    "по верхней неделе" to WeekLesson.Upper,
+    "по нижней неделе" to WeekLesson.Lower
 )

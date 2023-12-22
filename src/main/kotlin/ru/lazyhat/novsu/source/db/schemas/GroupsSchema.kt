@@ -1,4 +1,4 @@
-package ru.lazyhat.dbnovsu.schemas
+package ru.lazyhat.novsu.source.db.schemas
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.datetime.LocalDateTime
@@ -9,7 +9,7 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.kotlin.datetime.datetime
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.jetbrains.exposed.sql.transactions.transaction
-import ru.lazyhat.dbnovsu.models.*
+import ru.lazyhat.novsu.models.*
 import ru.lazyhat.utils.now
 import ru.lazyhat.utils.ubyteEnumeration
 

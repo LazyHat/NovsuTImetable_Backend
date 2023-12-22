@@ -1,5 +1,7 @@
 package ru.lazyhat.plugins
 
+import io.ktor.client.*
+import io.ktor.client.engine.okhttp.*
 import io.ktor.server.application.*
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
@@ -7,17 +9,19 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import org.koin.core.module.Module
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
-import ru.lazyhat.dbnovsu.WeekState
-import ru.lazyhat.dbnovsu.WeekStateImpl
-import ru.lazyhat.dbnovsu.repo.NovsuRepository
-import ru.lazyhat.dbnovsu.repo.NovsuRepositoryImpl
-import ru.lazyhat.dbnovsu.schemas.GroupsService
-import ru.lazyhat.dbnovsu.schemas.GroupsServiceImpl
-import ru.lazyhat.dbnovsu.schemas.LessonsService
-import ru.lazyhat.dbnovsu.schemas.LessonsServiceImpl
 import ru.lazyhat.dbproducts.repo.ProductsRepository
 import ru.lazyhat.dbproducts.repo.ProductsRepositoryImpl
 import ru.lazyhat.dbproducts.schemas.*
+import ru.lazyhat.novsu.repo.NovsuRepository
+import ru.lazyhat.novsu.repo.NovsuRepositoryImpl
+import ru.lazyhat.novsu.service.WeekService
+import ru.lazyhat.novsu.service.WeekServiceImpl
+import ru.lazyhat.novsu.source.db.schemas.GroupsService
+import ru.lazyhat.novsu.source.db.schemas.GroupsServiceImpl
+import ru.lazyhat.novsu.source.db.schemas.LessonsService
+import ru.lazyhat.novsu.source.db.schemas.LessonsServiceImpl
+import ru.lazyhat.novsu.source.net.NetworkSource
+import ru.lazyhat.novsu.source.net.NetworkSourceImpl
 
 fun Application.configureDatabaseModule(): Module {
     val driver = environment.config.property("storage.driverClassName").getString()
@@ -26,8 +30,8 @@ fun Application.configureDatabaseModule(): Module {
     val user = environment.config.property("storage.user").getString()
     val pass = environment.config.property("storage.pass").getString()
 
-    return module {
-        this.single<Database>(qualifier = named("novsu")) {
+    return module(createdAtStart = true) {
+        single<Database>(qualifier = named("novsu")) {
             Database.connect(
                 url = novsuURL,
                 driver = driver,
@@ -35,13 +39,16 @@ fun Application.configureDatabaseModule(): Module {
                 password = pass
             )
         }
-        this.single<LessonsService> { LessonsServiceImpl(this.get(named("novsu"))) }
-        this.single<GroupsService> { GroupsServiceImpl(this.get(named("novsu"))) }
-        this.single<WeekState> { WeekStateImpl() }
-        this.single<NovsuRepository> { NovsuRepositoryImpl(get(), get(), get()) }
+        single<HttpClient> { HttpClient(OkHttp) }
+        single<LessonsService> { LessonsServiceImpl(get(named("novsu"))) }
+        single<GroupsService> { GroupsServiceImpl(get(named("novsu"))) }
+        single<NetworkSource> { NetworkSourceImpl(get()) }
+        single<NovsuRepository> { NovsuRepositoryImpl(get(), get(), get(), get()) }
+
+        single<WeekService> { WeekServiceImpl(get()) }
 
 
-        this.single<Database>(named("products")) {
+        single<Database>(named("products")) {
             Database.connect(
                 url = productsURL,
                 driver = driver,
@@ -60,18 +67,18 @@ fun Application.configureDatabaseModule(): Module {
             }
         }
 
-        this.single<ShopsService> { ShopsServiceImpl(this.get(named("products"))) }
-        this.single<PricesService> { PricesServiceImpl(this.get(named("products"))) }
-        this.single<ProductRecordsService> { ProductRecordsServiceImpl(this.get(named("products"))) }
-        this.single<ProductsService> { ProductsServiceImpl(this.get(named("products"))) }
-        this.single<CartsService> { CartsServiceImpl(this.get(named("products"))) }
-        this.single<ProductsRepository> {
+        single<ShopsService> { ShopsServiceImpl(get(named("products"))) }
+        single<PricesService> { PricesServiceImpl(get(named("products"))) }
+        single<ProductRecordsService> { ProductRecordsServiceImpl(get(named("products"))) }
+        single<ProductsService> { ProductsServiceImpl(get(named("products"))) }
+        single<CartsService> { CartsServiceImpl(get(named("products"))) }
+        single<ProductsRepository> {
             ProductsRepositoryImpl(
-                this.get(),
-                this.get(),
-                this.get(),
-                this.get(),
-                this.get()
+                get(),
+                get(),
+                get(),
+                get(),
+                get()
             )
         }
     }

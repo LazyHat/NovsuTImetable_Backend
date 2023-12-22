@@ -1,4 +1,4 @@
-package ru.lazyhat.dbnovsu.schemas
+package ru.lazyhat.novsu.source.db.schemas
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.datetime.DayOfWeek
@@ -8,7 +8,7 @@ import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.jetbrains.exposed.sql.transactions.transaction
-import ru.lazyhat.dbnovsu.models.*
+import ru.lazyhat.novsu.models.*
 import ru.lazyhat.utils.listEnumeration
 import ru.lazyhat.utils.ubyteEnumeration
 
@@ -26,7 +26,7 @@ class LessonsServiceImpl(private val database: Database) : LessonsService {
         override val id: Column<EntityID<UInt>> = uinteger("id").autoIncrement().entityId()
         val title = text("title")
         val dow = ubyteEnumeration("dow", DayOfWeek.entries)
-        val week = ubyteEnumeration("week", Week.entries)
+        val week = ubyteEnumeration("week", WeekLesson.entries)
         val group = reference("group", GroupsServiceImpl.Groups, onDelete = ReferenceOption.CASCADE)
         val subgroup = ubyte("subgroup")
         val teacher = varchar("teacher", 60)
