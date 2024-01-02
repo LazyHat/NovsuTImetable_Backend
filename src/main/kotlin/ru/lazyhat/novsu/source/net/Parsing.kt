@@ -108,22 +108,27 @@ internal object Parsing {
     }
 
     suspend fun parseWeek(client: HttpClient): Week {
-        val doc = client.get("https://portal.novsu.ru/study").bodyAsText().let { Jsoup.parse(it) }
-        val body = doc.body()
-        val divNovsu = body.getElementsByClass("novsu").first()!!
-        val divBody = divNovsu.getElementById("body")!!
-        val divRow = divBody.getElementsByClass("row").first()!!
-        val divRowEl = divRow.getElementsByClass("row_el").first()!!
-        val divCol = divRowEl.getElementsByClass("col").first()!!
-        val divColElement = divCol.getElementsByClass("col_element").first()!!
-        val divBlock3 = divColElement.getElementsByClass("block3").first()!!
-        val divBlock_3padding = divBlock3.getElementsByClass("block_3padding").first()!!
-        val weekText = divBlock_3padding.getElementsByTag("b").first()?.text().orEmpty()
-        return if (weekText.contains("верхняя"))
-            Week.Upper
-        else if (weekText.contains("нижняя"))
-            Week.Lower
-        else
-            Week.Unknown
+       return try {
+           val doc = client.get("https://portal.novsu.ru/study").bodyAsText().let { Jsoup.parse(it) }
+           val body = doc.body()
+           val divNovsu = body.getElementsByClass("novsu").first()!!
+           val divBody = divNovsu.getElementById("body")!!
+           val divRow = divBody.getElementsByClass("row").first()!!
+           val divRowEl = divRow.getElementsByClass("row_el").first()!!
+           val divCol = divRowEl.getElementsByClass("col").first()!!
+           val divColElement = divCol.getElementsByClass("col_element").first()!!
+           val divBlock3 = divColElement.getElementsByClass("block3").first()!!
+           val divBlock_3padding = divBlock3.getElementsByClass("block_3padding").first()!!
+           val weekText = divBlock_3padding.getElementsByTag("b").first()!!.text()
+           return if (weekText.contains("верхняя"))
+               Week.Upper
+           else if (weekText.contains("нижняя"))
+               Week.Lower
+           else
+               Week.Unknown
+       }
+       catch (e: Exception){
+           Week.Unknown
+       }
     }
 }
