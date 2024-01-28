@@ -161,6 +161,8 @@ val typeCodes = mapOf(
 val weekLessonCodes = mapOf(
     "по верх. неделе" to WeekLesson.Upper,
     "по нижн. неделе" to WeekLesson.Lower,
+    "по верх.неделе" to WeekLesson.Upper,
+    "по нижн.неделе" to WeekLesson.Lower,
     "по верхней неделе" to WeekLesson.Upper,
     "по нижней неделе" to WeekLesson.Lower
 )
